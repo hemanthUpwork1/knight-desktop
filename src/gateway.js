@@ -2,7 +2,7 @@ const fetch = require('node-fetch');
 
 async function chat(messages) {
   const gatewayUrl = process.env.OPENCLAW_GATEWAY_URL || 'http://localhost:18789';
-  const gatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN || '9328171ca35ebc3eae9bba3ef3298a9b08561b543992e553';
+  const gatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN || '';
 
   const res = await fetch(`${gatewayUrl}/v1/chat/completions`, {
     method: 'POST',
