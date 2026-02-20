@@ -12,7 +12,8 @@ const tests = [
   { name: 'Whisper Transcription', file: 'test-whisper.js' },
   { name: 'Gateway Chat', file: 'test-gateway.js' },
   { name: 'TTS (Text-to-Speech)', file: 'test-tts.js' },
-  { name: 'End-to-End Flow', file: 'test-e2e.js' }
+  { name: 'End-to-End Flow', file: 'test-e2e.js' },
+  { name: 'GUI Hotkey (Alt+Space)', file: 'test-gui-hotkey.js' }
 ];
 
 let passCount = 0;

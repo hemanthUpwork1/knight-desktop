@@ -10,7 +10,8 @@
     "test:whisper": "node test/test-whisper.js",
     "test:gateway": "node test/test-gateway.js",
     "test:tts": "node test/test-tts.js",
-    "test:e2e": "node test/test-e2e.js"
+    "test:e2e": "node test/test-e2e.js",
+    "test:gui": "node test/test-gui-hotkey.js"
   },
   "dependencies": {
     "dotenv": "^16.0.0",
