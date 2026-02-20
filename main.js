@@ -1,7 +1,13 @@
 const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
 const { menubar } = require('menubar');
 const path = require('path');
-require('dotenv').config();
+const dotenv = require('dotenv');
+
+const envConfig = dotenv.config();
+console.log('[Main] .env loaded from:', envConfig.parsed ? 'file' : 'not found');
+console.log('[Main] OPENCLAW_GATEWAY_URL:', process.env.OPENCLAW_GATEWAY_URL);
+console.log('[Main] OPENCLAW_GATEWAY_TOKEN:', process.env.OPENCLAW_GATEWAY_TOKEN ? '***' : 'NOT SET');
+console.log('[Main] OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '***' : 'NOT SET');
 
 const { transcribe } = require('./src/whisper');
 const { chat } = require('./src/gateway');
