@@ -5,7 +5,12 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --mac --universal"
+    "build": "electron-builder --mac --universal",
+    "test": "node test/run-all-tests.js",
+    "test:whisper": "node test/test-whisper.js",
+    "test:gateway": "node test/test-gateway.js",
+    "test:tts": "node test/test-tts.js",
+    "test:e2e": "node test/test-e2e.js"
   },
   "dependencies": {
     "dotenv": "^16.0.0",

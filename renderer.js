@@ -28,13 +28,14 @@ async function init() {
 
     if (!result.success) {
       statusBar.textContent = 'Transcribe failed';
-      console.error(result.error);
+      console.error('Transcription failed:', result.error);
       setTimeout(() => {
-        statusBar.textContent = 'Press F13 to talk';
+        statusBar.textContent = 'Press Alt+Space to talk';
       }, 2000);
       return;
     }
 
+    console.log('Transcribed:', result.text);
     const userMessage = result.text;
     addMessage(userMessage, 'user');
 
@@ -42,91 +43,79 @@ async function init() {
     statusBar.textContent = 'Thinking...';
     messages.push({ role: 'user', content: userMessage });
 
+    console.log('Sending to gateway:', messages);
     const chatResult = await window.knight.chat(messages);
     if (!chatResult.success) {
       statusBar.textContent = 'Chat failed';
-      console.error(chatResult.error);
+      console.error('Chat failed:', chatResult.error);
       setTimeout(() => {
-        statusBar.textContent = 'Press F13 to talk';
+        statusBar.textContent = 'Press Alt+Space to talk';
       }, 2000);
       return;
     }
 
+    console.log('Chat response:', chatResult.response);
     const assistantMessage = chatResult.response;
     messages.push({ role: 'assistant', content: assistantMessage });
     addMessage(assistantMessage, 'assistant');
 
     // Speak the response
     statusBar.textContent = 'Speaking...';
+    console.log('Speaking:', assistantMessage);
     const speakResult = await window.knight.speak(assistantMessage);
     if (!speakResult.success) {
-      console.error(speakResult.error);
+      console.error('TTS failed:', speakResult.error);
     }
 
-    statusBar.textContent = 'Press F13 to talk';
+    statusBar.textContent = 'Press Alt+Space to talk';
   };
 }
 
-// Start recording from hotkey
+// IPC listener for Alt+Space hotkey from main.js
 window.knight.onStartRecording(() => {
+  console.log('IPC: start-recording received');
   if (!isRecording && mediaRecorder) {
     isRecording = true;
     audioChunks = [];
     mediaRecorder.start();
     statusBar.textContent = 'Listening...';
     micButton.classList.add('recording');
-  }
-});
-
-// Stop recording (triggered by keyup listener or button)
-window.knight.onStopRecording(() => {
-  if (isRecording && mediaRecorder) {
-    isRecording = false;
-    mediaRecorder.stop();
-    micButton.classList.remove('recording');
+    console.log('Recording started');
   }
 });
 
 // Manual mic button click
 micButton.addEventListener('mousedown', () => {
+  console.log('Mic button pressed');
   if (!isRecording && mediaRecorder) {
     isRecording = true;
     audioChunks = [];
     mediaRecorder.start();
     statusBar.textContent = 'Listening...';
     micButton.classList.add('recording');
+    console.log('Recording started (button)');
   }
 });
 
 micButton.addEventListener('mouseup', () => {
+  console.log('Mic button released');
   if (isRecording && mediaRecorder) {
     isRecording = false;
     mediaRecorder.stop();
     micButton.classList.remove('recording');
+    console.log('Recording stopped (button)');
   }
 });
 
-// Global keydown/keyup listener for F13 (code 123)
-document.addEventListener('keydown', (e) => {
-  if (e.keyCode === 123) {
-    e.preventDefault();
-    if (!isRecording && mediaRecorder) {
-      isRecording = true;
-      audioChunks = [];
-      mediaRecorder.start();
-      statusBar.textContent = 'Listening...';
-      micButton.classList.add('recording');
-    }
-  }
-});
-
+// Local keyup listener to stop recording (Alt key release)
 document.addEventListener('keyup', (e) => {
-  if (e.keyCode === 123) {
-    e.preventDefault();
+  if (e.key === 'Alt') {
+    console.log('Alt key released');
     if (isRecording && mediaRecorder) {
       isRecording = false;
       mediaRecorder.stop();
       micButton.classList.remove('recording');
+      console.log('Recording stopped (Alt release)');
     }
   }
 });
@@ -140,7 +129,11 @@ function addMessage(text, role) {
 }
 
 // Initialize on page load
+console.log('Knight app initializing...');
 init().catch(err => {
   statusBar.textContent = 'Microphone access denied';
   console.error('Init error:', err);
 });
+
+// Set initial status
+statusBar.textContent = 'Press Alt+Space to talk';
