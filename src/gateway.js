@@ -6,30 +6,52 @@ async function chat(messages) {
 
   console.log('[Gateway] URL:', gatewayUrl);
   console.log('[Gateway] Token:', gatewayToken ? '***' : 'NOT SET');
-  console.log('[Gateway] Endpoint: /v1/chat/completions');
 
-  const res = await fetch(`${gatewayUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${gatewayToken}`
-    },
-    body: JSON.stringify({
-      model: 'anthropic/claude-haiku-4-5',
-      messages: messages
-    })
-  });
+  // Try /v1/messages first (OpenClaw native), fall back to /v1/chat/completions (OpenAI compat)
+  const endpoints = [
+    '/v1/messages',
+    '/api/chat',
+    '/v1/chat/completions'
+  ];
 
-  console.log('[Gateway] Response status:', res.status);
-  
-  if (!res.ok) {
-    const errorText = await res.text();
-    console.log('[Gateway] Error response:', errorText);
-    throw new Error(`Gateway API error: ${res.status} ${res.statusText}`);
+  let lastError;
+  for (const endpoint of endpoints) {
+    console.log('[Gateway] Trying endpoint:', endpoint);
+    
+    try {
+      const body = endpoint === '/v1/messages' 
+        ? JSON.stringify({ model: 'claude-haiku-4-5', messages })
+        : JSON.stringify({ model: 'anthropic/claude-haiku-4-5', messages });
+
+      const res = await fetch(`${gatewayUrl}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${gatewayToken}`
+        },
+        body
+      });
+
+      console.log('[Gateway] Response status:', res.status);
+      
+      if (res.ok) {
+        const data = await res.json();
+        return data.choices[0].message.content || data.content[0].text;
+      } else if (res.status !== 404) {
+        // Not a "not found" error, so fail
+        const errorText = await res.text();
+        console.log('[Gateway] Error response:', errorText);
+        throw new Error(`Gateway API error: ${res.status} ${res.statusText}`);
+      }
+      
+      lastError = `${endpoint} returned 404`;
+    } catch (err) {
+      lastError = err.message;
+      continue;
+    }
   }
 
-  const data = await res.json();
-  return data.choices[0].message.content;
+  throw new Error(`Gateway chat failed: ${lastError}`);
 }
 
 module.exports = { chat };
