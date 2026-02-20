@@ -1,5 +1,5 @@
 const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
-const menubar = require('menubar');
+const { menubar } = require('menubar');
 const path = require('path');
 require('dotenv').config();
 
