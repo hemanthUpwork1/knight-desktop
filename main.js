@@ -10,34 +10,40 @@ const { speak } = require('./src/tts');
 let mb;
 
 app.on('ready', () => {
+  const preloadPath = path.join(__dirname, 'preload.js');
+  console.log('Using preload:', preloadPath);
+  
   mb = menubar({
     index: `file://${path.join(__dirname, 'index.html')}`,
     windowPosition: 'topRight',
     preloadWindow: true,
     showDockIcon: false,
     width: 350,
-    height: 500
-    // Icon removed - using default menubar icon
+    height: 500,
+    // Pass webPreferences to menubar with correct config
+    browserWindow: {
+      webPreferences: {
+        preload: preloadPath,
+        nodeIntegration: false,
+        contextIsolation: true,
+        enableRemoteModule: false,
+        sandbox: true
+      }
+    }
   });
 
   mb.on('ready', () => {
     // Register Alt+Space hotkey
     globalShortcut.register('Alt+Space', () => {
       if (mb.window) {
-        console.log('Alt+Space pressed, sending IPC message');
+        console.log('[Main] Alt+Space pressed, sending IPC message');
         mb.window.webContents.send('start-recording');
       }
     });
   });
 
   mb.on('after-create-window', () => {
-    // Force preload by reloading with explicit preload
-    const { BrowserWindow } = require('electron');
-    const preloadPath = path.join(__dirname, 'preload.js');
-    
-    mb.window.webContents.session.setPreloads([preloadPath]);
-    console.log('Preload set:', preloadPath);
-    
+    console.log('[Main] Window created. Opening DevTools...');
     // Open DevTools for debugging
     mb.window.webContents.openDevTools({ mode: 'detach' });
   });
