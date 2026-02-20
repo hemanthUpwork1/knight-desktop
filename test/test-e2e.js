@@ -38,8 +38,9 @@ async function runTest() {
 
   // Step 3: Chat
   console.log('💬 Step 3: Sending to gateway chat...');
+  let assistantResponse;
   try {
-    const assistantResponse = await chat(messages);
+    assistantResponse = await chat(messages);
     console.log(`✅ Response: "${assistantResponse}"\n`);
     messages.push({ role: 'assistant', content: assistantResponse });
   } catch (err) {
