@@ -16,29 +16,29 @@ app.on('ready', () => {
     preloadWindow: true,
     showDockIcon: false,
     width: 350,
-    height: 500,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: false,
-      contextIsolation: true
-    }
+    height: 500
     // Icon removed - using default menubar icon
   });
 
   mb.on('ready', () => {
-    // Register Option+Space hotkey
+    // Register Alt+Space hotkey
     globalShortcut.register('Alt+Space', () => {
       if (mb.window) {
+        console.log('Alt+Space pressed, sending IPC message');
         mb.window.webContents.send('start-recording');
       }
     });
-
-    // Handle keyup for Alt+Space (stop recording)
-    // Note: globalShortcut doesn't support keyup, so we'll use a workaround
-    // by having the renderer listen for key events and send stop when appropriate
   });
 
   mb.on('after-create-window', () => {
+    // Force preload by reloading with explicit preload
+    const { BrowserWindow } = require('electron');
+    const preloadPath = path.join(__dirname, 'preload.js');
+    
+    mb.window.webContents.session.setPreloads([preloadPath]);
+    console.log('Preload set:', preloadPath);
+    
+    // Open DevTools for debugging
     mb.window.webContents.openDevTools({ mode: 'detach' });
   });
 
