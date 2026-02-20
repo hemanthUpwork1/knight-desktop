@@ -16,7 +16,12 @@ app.on('ready', () => {
     preloadWindow: true,
     showDockIcon: false,
     width: 350,
-    height: 500
+    height: 500,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true
+    }
     // Icon removed - using default menubar icon
   });
 
