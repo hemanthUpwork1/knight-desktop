@@ -12,12 +12,12 @@ let mb;
 app.on('ready', () => {
   mb = menubar({
     index: `file://${path.join(__dirname, 'index.html')}`,
-    icon: path.join(__dirname, 'assets', 'iconTemplate.png'),
     windowPosition: 'topRight',
     preloadWindow: true,
     showDockIcon: false,
     width: 350,
     height: 500
+    // Icon removed - using default menubar icon
   });
 
   mb.on('ready', () => {
