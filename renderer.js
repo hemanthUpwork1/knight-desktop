@@ -72,50 +72,55 @@ async function init() {
 }
 
 // IPC listener for Alt+Space hotkey from main.js
-window.knight.onStartRecording(() => {
-  console.log('IPC: start-recording received');
-  if (!isRecording && mediaRecorder) {
-    isRecording = true;
-    audioChunks = [];
-    mediaRecorder.start();
-    statusBar.textContent = 'Listening...';
-    micButton.classList.add('recording');
-    console.log('Recording started');
-  }
-});
+console.log('[Renderer] Registering IPC listener for start-recording...');
+if (window.knight && window.knight.onStartRecording) {
+  window.knight.onStartRecording(() => {
+    console.log('[Renderer] ✅ IPC: start-recording received');
+    if (!isRecording && mediaRecorder) {
+      isRecording = true;
+      audioChunks = [];
+      mediaRecorder.start();
+      statusBar.textContent = 'Listening...';
+      micButton.classList.add('recording');
+      console.log('[Renderer] Recording started');
+    }
+  });
+} else {
+  console.error('[Renderer] ❌ window.knight.onStartRecording not available');
+}
 
 // Manual mic button click
 micButton.addEventListener('mousedown', () => {
-  console.log('Mic button pressed');
+  console.log('[Renderer] Mic button pressed');
   if (!isRecording && mediaRecorder) {
     isRecording = true;
     audioChunks = [];
     mediaRecorder.start();
     statusBar.textContent = 'Listening...';
     micButton.classList.add('recording');
-    console.log('Recording started (button)');
+    console.log('[Renderer] Recording started (button)');
   }
 });
 
 micButton.addEventListener('mouseup', () => {
-  console.log('Mic button released');
+  console.log('[Renderer] Mic button released');
   if (isRecording && mediaRecorder) {
     isRecording = false;
     mediaRecorder.stop();
     micButton.classList.remove('recording');
-    console.log('Recording stopped (button)');
+    console.log('[Renderer] Recording stopped (button)');
   }
 });
 
 // Local keyup listener to stop recording (Alt key release)
 document.addEventListener('keyup', (e) => {
   if (e.key === 'Alt') {
-    console.log('Alt key released');
+    console.log('[Renderer] Alt key released');
     if (isRecording && mediaRecorder) {
       isRecording = false;
       mediaRecorder.stop();
       micButton.classList.remove('recording');
-      console.log('Recording stopped (Alt release)');
+      console.log('[Renderer] Recording stopped (Alt release)');
     }
   }
 });
@@ -129,11 +134,22 @@ function addMessage(text, role) {
 }
 
 // Initialize on page load
-console.log('Knight app initializing...');
+console.log('[Renderer] Knight app initializing...');
+console.log('[Renderer] window.knight object:', typeof window.knight);
+
+if (!window.knight) {
+  console.error('[Renderer] ❌ window.knight is undefined! Preload script not loaded.');
+  statusBar.textContent = 'ERROR: Preload not loaded';
+} else {
+  console.log('[Renderer] ✅ window.knight loaded successfully');
+  console.log('[Renderer] Available methods:', Object.keys(window.knight));
+}
+
 init().catch(err => {
   statusBar.textContent = 'Microphone access denied';
-  console.error('Init error:', err);
+  console.error('[Renderer] Init error:', err);
 });
 
 // Set initial status
 statusBar.textContent = 'Press Alt+Space to talk';
+console.log('[Renderer] Ready. Listening for Alt+Space...');
