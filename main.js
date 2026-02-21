@@ -14,6 +14,7 @@ const { chat } = require('./src/gateway');
 const { speak } = require('./src/tts');
 
 let mb;
+let recordingTimeout;
 
 app.on('ready', () => {
   const preloadPath = path.join(__dirname, 'preload.js');
@@ -42,8 +43,17 @@ app.on('ready', () => {
     // Register Alt+Space hotkey
     globalShortcut.register('Alt+Space', () => {
       if (mb.window) {
-        console.log('[Main] Alt+Space pressed, sending IPC message');
+        console.log('[Main] Alt+Space pressed, starting recording...');
         mb.window.webContents.send('start-recording');
+        
+        // Auto-stop after 10 seconds (max recording length)
+        clearTimeout(recordingTimeout);
+        recordingTimeout = setTimeout(() => {
+          if (mb.window) {
+            console.log('[Main] Auto-stopping recording (10s timeout)');
+            mb.window.webContents.send('stop-recording');
+          }
+        }, 10000);
       }
     });
   });
