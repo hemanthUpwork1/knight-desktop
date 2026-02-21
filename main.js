@@ -40,14 +40,16 @@ app.on('ready', () => {
   });
 
   mb.on('ready', () => {
-    // Register Alt+Space hotkey
-    globalShortcut.register('Alt+Space', () => {
+    // Register FN key for push-to-talk
+    // Note: Electron's globalShortcut only detects keydown, not keyup
+    // So we auto-stop after 5 seconds (similar to Whisper Flow)
+    globalShortcut.register('F13', () => {  // F13 = FN key on macOS
       if (mb.window) {
-        console.log('[Main] Alt+Space pressed, starting recording...');
+        console.log('[Main] FN pressed, starting recording...');
+        mb.window.show();  // Bring window to focus
         mb.window.webContents.send('start-recording');
         
         // Auto-stop after 5 seconds (max recording length)
-        // TODO: Replace with hold-to-record when keyup detection is available
         clearTimeout(recordingTimeout);
         recordingTimeout = setTimeout(() => {
           if (mb.window) {
