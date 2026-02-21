@@ -16,13 +16,15 @@ async function chat(messages) {
 
   let lastError;
   for (const endpoint of endpoints) {
-    console.log('[Gateway] Trying endpoint:', endpoint);
+    const endpointStartTime = Date.now();
+    console.log(`[Gateway] ⏱️  Trying endpoint: ${endpoint}`);
     
     try {
       const body = endpoint === '/v1/messages' 
         ? JSON.stringify({ model: 'claude-haiku-4-5', messages })
         : JSON.stringify({ model: 'anthropic/claude-haiku-4-5', messages });
 
+      const fetchStartTime = Date.now();
       const res = await fetch(`${gatewayUrl}${endpoint}`, {
         method: 'POST',
         headers: {
@@ -31,16 +33,19 @@ async function chat(messages) {
         },
         body
       });
+      const fetchEndTime = Date.now();
+      console.log(`[Gateway] ⏱️  Fetch took ${fetchEndTime - fetchStartTime}ms, status: ${res.status}`);
 
-      console.log('[Gateway] Response status:', res.status);
-      console.log('[Gateway] Response headers:', JSON.stringify([...res.headers.entries()]));
-      
       if (res.ok) {
+        const parseStartTime = Date.now();
         const data = await res.json();
+        const parseEndTime = Date.now();
+        console.log(`[Gateway] ⏱️  JSON parse took ${parseEndTime - parseStartTime}ms`);
+        console.log(`[Gateway] ⏱️  Total endpoint time: ${Date.now() - endpointStartTime}ms`);
         return data.choices[0].message.content || data.content[0].text;
       } else {
         const errorText = await res.text();
-        console.log('[Gateway] Error response:', errorText);
+        console.log(`[Gateway] ⏱️  Error (${res.status}) received after ${Date.now() - fetchStartTime}ms`);
         
         if (res.status === 404) {
           lastError = `${endpoint} returned 404`;
@@ -54,6 +59,7 @@ async function chat(messages) {
       lastError = `${endpoint} returned 404`;
     } catch (err) {
       lastError = err.message;
+      console.log(`[Gateway] ⏱️  Exception after ${Date.now() - endpointStartTime}ms: ${err.message}`);
       continue;
     }
   }
