@@ -40,20 +40,18 @@ app.on('ready', () => {
   });
 
   mb.on('ready', () => {
-    // Register FN key for push-to-talk
-    // Note: Electron's globalShortcut only detects keydown, not keyup
-    // So we auto-stop after 5 seconds (similar to Whisper Flow)
-    globalShortcut.register('F13', () => {  // F13 = FN key on macOS
+    // Register Alt+Space hotkey
+    globalShortcut.register('Alt+Space', () => {
       if (mb.window) {
-        console.log('[Main] FN pressed, starting recording...');
-        mb.window.show();  // Bring window to focus
+        console.log('[Main] ⏱️  [00:00] Alt+Space pressed, starting recording...');
+        mb.window.show();
         mb.window.webContents.send('start-recording');
         
-        // Auto-stop after 5 seconds (max recording length)
+        // Auto-stop after 5 seconds
         clearTimeout(recordingTimeout);
         recordingTimeout = setTimeout(() => {
           if (mb.window) {
-            console.log('[Main] Auto-stopping recording (5s timeout)');
+            console.log('[Main] ⏱️  [05:00] Auto-stopping recording (5s timeout)');
             mb.window.webContents.send('stop-recording');
           }
         }, 5000);

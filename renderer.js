@@ -19,18 +19,22 @@ async function init() {
   };
 
   mediaRecorder.onstop = async () => {
+    const recordEndTime = Date.now();
     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
     audioChunks = [];
 
     statusBar.textContent = 'Transcribing...';
+    const transcribeStartTime = Date.now();
     const buffer = await audioBlob.arrayBuffer();
     const result = await window.knight.transcribe(buffer);
+    const transcribeEndTime = Date.now();
+    console.log(`[Renderer] ⏱️  Transcribe took ${transcribeEndTime - transcribeStartTime}ms`);
 
     if (!result.success) {
       statusBar.textContent = 'Transcribe failed';
       console.error('[Renderer] Transcription failed:', result.error);
       setTimeout(() => {
-        statusBar.textContent = 'Press FN to talk';
+        statusBar.textContent = 'Press Alt+Space to talk';
       }, 2000);
       return;
     }
@@ -44,12 +48,16 @@ async function init() {
     messages.push({ role: 'user', content: userMessage });
 
     console.log('[Renderer] Sending to gateway:', messages);
+    const chatStartTime = Date.now();
     const chatResult = await window.knight.chat(messages);
+    const chatEndTime = Date.now();
+    console.log(`[Renderer] ⏱️  Chat took ${chatEndTime - chatStartTime}ms`);
+    
     if (!chatResult.success) {
       statusBar.textContent = 'Chat failed';
       console.error('[Renderer] Chat failed:', chatResult.error);
       setTimeout(() => {
-        statusBar.textContent = 'Press FN to talk';
+        statusBar.textContent = 'Press Alt+Space to talk';
       }, 2000);
       return;
     }
@@ -62,12 +70,19 @@ async function init() {
     // Speak the response
     statusBar.textContent = 'Speaking...';
     console.log('[Renderer] Speaking:', assistantMessage);
+    const ttsStartTime = Date.now();
     const speakResult = await window.knight.speak(assistantMessage);
+    const ttsEndTime = Date.now();
+    console.log(`[Renderer] ⏱️  TTS took ${ttsEndTime - ttsStartTime}ms`);
+    
     if (!speakResult.success) {
       console.error('[Renderer] TTS failed:', speakResult.error);
     }
 
-    statusBar.textContent = 'Press FN to talk';
+    const totalEndTime = Date.now();
+    console.log(`[Renderer] ⏱️  TOTAL TIME: ${totalEndTime - recordEndTime}ms (Transcribe: ${transcribeEndTime - transcribeStartTime}ms, Chat: ${chatEndTime - chatStartTime}ms, TTS: ${ttsEndTime - ttsStartTime}ms)`);
+    
+    statusBar.textContent = 'Press Alt+Space to talk';
   };
 }
 
@@ -148,5 +163,5 @@ init().catch(err => {
 });
 
 // Set initial status
-statusBar.textContent = 'Press FN to talk';
-console.log('[Renderer] Ready. Press FN key to start recording...');
+statusBar.textContent = 'Press Alt+Space to talk';
+console.log('[Renderer] Ready. Press Alt+Space to start recording...');
