@@ -46,14 +46,15 @@ app.on('ready', () => {
         console.log('[Main] Alt+Space pressed, starting recording...');
         mb.window.webContents.send('start-recording');
         
-        // Auto-stop after 10 seconds (max recording length)
+        // Auto-stop after 5 seconds (max recording length)
+        // TODO: Replace with hold-to-record when keyup detection is available
         clearTimeout(recordingTimeout);
         recordingTimeout = setTimeout(() => {
           if (mb.window) {
-            console.log('[Main] Auto-stopping recording (10s timeout)');
+            console.log('[Main] Auto-stopping recording (5s timeout)');
             mb.window.webContents.send('stop-recording');
           }
-        }, 10000);
+        }, 5000);
       }
     });
   });
