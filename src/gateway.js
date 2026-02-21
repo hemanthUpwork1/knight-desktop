@@ -33,14 +33,21 @@ async function chat(messages) {
       });
 
       console.log('[Gateway] Response status:', res.status);
+      console.log('[Gateway] Response headers:', JSON.stringify([...res.headers.entries()]));
       
       if (res.ok) {
         const data = await res.json();
         return data.choices[0].message.content || data.content[0].text;
-      } else if (res.status !== 404) {
-        // Not a "not found" error, so fail
+      } else {
         const errorText = await res.text();
         console.log('[Gateway] Error response:', errorText);
+        
+        if (res.status === 404) {
+          lastError = `${endpoint} returned 404`;
+          continue;
+        }
+        
+        // For other errors (401, 405, 500, etc), fail immediately
         throw new Error(`Gateway API error: ${res.status} ${res.statusText}`);
       }
       
