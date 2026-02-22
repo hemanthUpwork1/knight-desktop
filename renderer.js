@@ -5,6 +5,7 @@ let audioContext;
 let analyser;
 let dataArray;
 let animationId;
+let currentStream;
 
 const pill = document.getElementById('pill');
 const waveform = document.getElementById('waveform');
@@ -63,84 +64,129 @@ function stopWaveformAnimation() {
   });
 }
 
-// Initialize
-async function init() {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+// Release microphone - stops the recording indicator
+function releaseMicrophone() {
+  if (currentStream) {
+    currentStream.getTracks().forEach(track => track.stop());
+    currentStream = null;
+  }
+  if (audioContext) {
+    audioContext.close();
+    audioContext = null;
+    analyser = null;
+  }
+  mediaRecorder = null;
+}
 
-  // Setup audio analyzer for waveform
-  audioContext = new AudioContext();
-  analyser = audioContext.createAnalyser();
-  analyser.fftSize = 256;
-  const source = audioContext.createMediaStreamSource(stream);
-  source.connect(analyser);
-  dataArray = new Uint8Array(analyser.frequencyBinCount);
+// Start recording - acquires mic on demand
+async function startRecording() {
+  if (isRecording) return;
 
-  mediaRecorder = new MediaRecorder(stream);
+  try {
+    // Acquire microphone only when needed
+    currentStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-  mediaRecorder.ondataavailable = (event) => {
-    audioChunks.push(event.data);
-  };
+    // Setup audio analyzer for waveform
+    audioContext = new AudioContext();
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    const source = audioContext.createMediaStreamSource(currentStream);
+    source.connect(analyser);
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-  mediaRecorder.onstop = async () => {
-    stopWaveformAnimation();
-    setState('processing');
+    mediaRecorder = new MediaRecorder(currentStream);
 
-    const recordEndTime = Date.now();
-    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+    mediaRecorder.ondataavailable = (event) => {
+      audioChunks.push(event.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+      stopWaveformAnimation();
+
+      // Release mic immediately after recording stops
+      const stream = currentStream;
+      releaseMicrophone();
+
+      setState('processing');
+
+      const recordEndTime = Date.now();
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      audioChunks = [];
+
+      const transcribeStartTime = Date.now();
+      const buffer = await audioBlob.arrayBuffer();
+      const result = await window.knight.transcribe(buffer);
+      const transcribeEndTime = Date.now();
+      console.log(`[Renderer] ⏱️  Transcribe took ${transcribeEndTime - transcribeStartTime}ms`);
+
+      if (!result.success) {
+        console.error('[Renderer] Transcription failed:', result.error);
+        setState('error', 'Transcribe failed');
+        setTimeout(() => setState('idle'), 2000);
+        return;
+      }
+
+      console.log('[Renderer] Transcribed:', result.text);
+      const userMessage = result.text;
+
+      // Send to gateway for response
+      messages.push({ role: 'user', content: userMessage });
+
+      console.log('[Renderer] Sending to gateway:', messages);
+      const chatStartTime = Date.now();
+      const chatResult = await window.knight.chat(messages);
+      const chatEndTime = Date.now();
+      console.log(`[Renderer] ⏱️  Chat took ${chatEndTime - chatStartTime}ms`);
+
+      if (!chatResult.success) {
+        console.error('[Renderer] Chat failed:', chatResult.error);
+        setState('error', 'Chat failed');
+        setTimeout(() => setState('idle'), 2000);
+        return;
+      }
+
+      console.log('[Renderer] Chat response:', chatResult.response);
+      const assistantMessage = chatResult.response;
+      messages.push({ role: 'assistant', content: assistantMessage });
+
+      // Speak the response
+      console.log('[Renderer] Speaking:', assistantMessage);
+      const ttsStartTime = Date.now();
+      const speakResult = await window.knight.speak(assistantMessage);
+      const ttsEndTime = Date.now();
+      console.log(`[Renderer] ⏱️  TTS took ${ttsEndTime - ttsStartTime}ms`);
+
+      if (!speakResult.success) {
+        console.error('[Renderer] TTS failed:', speakResult.error);
+      }
+
+      const totalEndTime = Date.now();
+      console.log(`[Renderer] ⏱️  TOTAL TIME: ${totalEndTime - recordEndTime}ms (Transcribe: ${transcribeEndTime - transcribeStartTime}ms, Chat: ${chatEndTime - chatStartTime}ms, TTS: ${ttsEndTime - ttsStartTime}ms)`);
+
+      setState('idle');
+    };
+
+    isRecording = true;
     audioChunks = [];
+    mediaRecorder.start();
+    setState('recording');
+    animateWaveform();
+    console.log('[Renderer] Recording started');
 
-    const transcribeStartTime = Date.now();
-    const buffer = await audioBlob.arrayBuffer();
-    const result = await window.knight.transcribe(buffer);
-    const transcribeEndTime = Date.now();
-    console.log(`[Renderer] ⏱️  Transcribe took ${transcribeEndTime - transcribeStartTime}ms`);
+  } catch (err) {
+    console.error('[Renderer] Failed to start recording:', err);
+    setState('error', 'Mic denied');
+    setTimeout(() => setState('idle'), 2000);
+  }
+}
 
-    if (!result.success) {
-      console.error('[Renderer] Transcription failed:', result.error);
-      setState('error', 'Transcribe failed');
-      setTimeout(() => setState('idle'), 2000);
-      return;
-    }
+// Stop recording
+function stopRecording() {
+  if (!isRecording || !mediaRecorder) return;
 
-    console.log('[Renderer] Transcribed:', result.text);
-    const userMessage = result.text;
-
-    // Send to gateway for response
-    messages.push({ role: 'user', content: userMessage });
-
-    console.log('[Renderer] Sending to gateway:', messages);
-    const chatStartTime = Date.now();
-    const chatResult = await window.knight.chat(messages);
-    const chatEndTime = Date.now();
-    console.log(`[Renderer] ⏱️  Chat took ${chatEndTime - chatStartTime}ms`);
-
-    if (!chatResult.success) {
-      console.error('[Renderer] Chat failed:', chatResult.error);
-      setState('error', 'Chat failed');
-      setTimeout(() => setState('idle'), 2000);
-      return;
-    }
-
-    console.log('[Renderer] Chat response:', chatResult.response);
-    const assistantMessage = chatResult.response;
-    messages.push({ role: 'assistant', content: assistantMessage });
-
-    // Speak the response
-    console.log('[Renderer] Speaking:', assistantMessage);
-    const ttsStartTime = Date.now();
-    const speakResult = await window.knight.speak(assistantMessage);
-    const ttsEndTime = Date.now();
-    console.log(`[Renderer] ⏱️  TTS took ${ttsEndTime - ttsStartTime}ms`);
-
-    if (!speakResult.success) {
-      console.error('[Renderer] TTS failed:', speakResult.error);
-    }
-
-    const totalEndTime = Date.now();
-    console.log(`[Renderer] ⏱️  TOTAL TIME: ${totalEndTime - recordEndTime}ms (Transcribe: ${transcribeEndTime - transcribeStartTime}ms, Chat: ${chatEndTime - chatStartTime}ms, TTS: ${ttsEndTime - ttsStartTime}ms)`);
-
-    setState('idle');
-  };
+  isRecording = false;
+  mediaRecorder.stop();
+  console.log('[Renderer] Recording stopped');
 }
 
 // IPC listener for key press from main.js
@@ -148,29 +194,12 @@ console.log('[Renderer] Registering IPC listeners...');
 if (window.knight && window.knight.onStartRecording) {
   window.knight.onStartRecording(() => {
     console.log('[Renderer] ✅ IPC: start-recording received');
-    if (!isRecording && mediaRecorder) {
-      isRecording = true;
-      audioChunks = [];
-
-      // Resume audio context if suspended
-      if (audioContext && audioContext.state === 'suspended') {
-        audioContext.resume();
-      }
-
-      mediaRecorder.start();
-      setState('recording');
-      animateWaveform();
-      console.log('[Renderer] Recording started');
-    }
+    startRecording();
   });
 
   window.knight.onStopRecording(() => {
     console.log('[Renderer] ✅ IPC: stop-recording received');
-    if (isRecording && mediaRecorder) {
-      isRecording = false;
-      mediaRecorder.stop();
-      console.log('[Renderer] Recording stopped');
-    }
+    stopRecording();
   });
 } else {
   console.error('[Renderer] ❌ window.knight.onStartRecording not available');
@@ -185,11 +214,6 @@ if (!window.knight) {
 } else {
   console.log('[Renderer] ✅ window.knight loaded successfully');
 }
-
-init().catch(err => {
-  setState('error', 'Mic denied');
-  console.error('[Renderer] Init error:', err);
-});
 
 setState('idle');
 console.log('[Renderer] Ready. Press Alt+Space to start recording...');
