@@ -107,7 +107,7 @@ if (window.knight && window.knight.onStartRecording) {
       isRecording = false;
       mediaRecorder.stop();
       micButton.classList.remove('recording');
-      console.log('[Renderer] Recording stopped (auto-stop after 5s)');
+      console.log('[Renderer] Recording stopped (key released)');
     }
   });
 } else {

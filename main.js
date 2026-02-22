@@ -2,6 +2,7 @@ const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
 const { menubar } = require('menubar');
 const path = require('path');
 const dotenv = require('dotenv');
+const { uIOhook, UiohookKey } = require('uiohook-napi');
 
 const envConfig = dotenv.config();
 console.log('[Main] .env loaded from:', envConfig.parsed ? 'file' : 'not found');
@@ -14,7 +15,9 @@ const { chat } = require('./src/gateway');
 const { speak } = require('./src/tts');
 
 let mb;
-let recordingTimeout;
+let isRecording = false;
+let altPressed = false;
+let spacePressed = false;
 
 app.on('ready', () => {
   const preloadPath = path.join(__dirname, 'preload.js');
@@ -40,23 +43,35 @@ app.on('ready', () => {
   });
 
   mb.on('ready', () => {
-    // Register Alt+Space hotkey
-    globalShortcut.register('Alt+Space', () => {
-      if (mb.window) {
-        console.log('[Main] ⏱️  [00:00] Alt+Space pressed, starting recording...');
+    // Setup push-to-talk with uiohook (detects key release)
+    uIOhook.on('keydown', (e) => {
+      if (e.keycode === UiohookKey.Alt) altPressed = true;
+      if (e.keycode === UiohookKey.Space) spacePressed = true;
+
+      // Start recording when Alt+Space pressed
+      if (altPressed && spacePressed && !isRecording && mb.window) {
+        isRecording = true;
+        console.log('[Main] Alt+Space pressed, starting recording...');
         mb.window.show();
         mb.window.webContents.send('start-recording');
-        
-        // Auto-stop after 5 seconds
-        clearTimeout(recordingTimeout);
-        recordingTimeout = setTimeout(() => {
-          if (mb.window) {
-            console.log('[Main] ⏱️  [05:00] Auto-stopping recording (5s timeout)');
-            mb.window.webContents.send('stop-recording');
-          }
-        }, 5000);
       }
     });
+
+    uIOhook.on('keyup', (e) => {
+      if (e.keycode === UiohookKey.Alt) altPressed = false;
+      if (e.keycode === UiohookKey.Space) spacePressed = false;
+
+      // Stop recording when either key is released
+      if (isRecording && (!altPressed || !spacePressed) && mb.window) {
+        isRecording = false;
+        console.log('[Main] Alt+Space released, stopping recording...');
+        mb.window.webContents.send('stop-recording');
+      }
+    });
+
+    // Start the hook
+    uIOhook.start();
+    console.log('[Main] uIOhook started, listening for Alt+Space...');
   });
 
   mb.on('after-create-window', () => {
@@ -102,5 +117,6 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  uIOhook.stop();
   globalShortcut.unregisterAll();
 });
