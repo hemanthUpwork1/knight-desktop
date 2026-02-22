@@ -24,8 +24,10 @@ async function chat(messages) {
         ? JSON.stringify({ model: 'claude-haiku-4-5', messages })
         : JSON.stringify({ model: 'anthropic/claude-haiku-4-5', messages });
 
+      const fullUrl = `${gatewayUrl}${endpoint}`;
+      console.log(`[Gateway] ⏱️  Full URL: ${fullUrl}`);
       const fetchStartTime = Date.now();
-      const res = await fetch(`${gatewayUrl}${endpoint}`, {
+      const res = await fetch(fullUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

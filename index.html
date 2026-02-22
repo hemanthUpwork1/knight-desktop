@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Knight - AI Voice Assistant</title>
+  <title>Knight</title>
   <style>
     * {
       margin: 0;
@@ -12,157 +12,148 @@
     }
 
     body {
-      background-color: #1a1a1a;
-      color: #ffffff;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: transparent;
+      overflow: hidden;
+      -webkit-app-region: drag;
+    }
+
+    .pill {
+      width: 200px;
+      height: 44px;
+      border-radius: 22px;
+      background: rgba(30, 30, 30, 0.95);
+      border: 1.5px solid rgba(255, 255, 255, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      transition: all 0.2s ease;
+      position: relative;
       overflow: hidden;
     }
 
-    .container {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      padding: 16px;
-      gap: 12px;
+    .pill.recording {
+      border-color: rgba(255, 255, 255, 0.3);
+      background: rgba(20, 20, 20, 0.98);
     }
 
-    .status-bar {
-      background-color: #2a2a2a;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 14px;
-      text-align: center;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid #3a3a3a;
+    .pill.processing {
+      border-color: rgba(100, 100, 255, 0.4);
     }
 
-    .chat-history {
-      flex: 1;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      padding: 8px 0;
-      border-bottom: 1px solid #3a3a3a;
-      min-height: 0;
-    }
-
-    .message {
-      padding: 8px 12px;
-      border-radius: 6px;
-      word-wrap: break-word;
-      font-size: 13px;
-      line-height: 1.4;
-    }
-
-    .message.user {
-      background-color: #0066ff;
-      align-self: flex-end;
-      max-width: 80%;
-    }
-
-    .message.assistant {
-      background-color: #3a3a3a;
-      align-self: flex-start;
-      max-width: 80%;
-    }
-
-    .controls {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .mic-button {
+    /* Idle state - subtle line */
+    .idle-indicator {
       width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      background-color: #0066ff;
-      border: 2px solid #0066ff;
-      cursor: pointer;
-      display: flex;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 1px;
+      transition: opacity 0.2s ease;
+    }
+
+    .pill.recording .idle-indicator,
+    .pill.processing .idle-indicator {
+      display: none;
+    }
+
+    /* Waveform visualization */
+    .waveform {
+      display: none;
       align-items: center;
       justify-content: center;
-      transition: all 0.2s ease;
-      position: relative;
-      font-size: 24px;
+      gap: 3px;
+      height: 100%;
+      padding: 0 20px;
     }
 
-    .mic-button:hover {
-      background-color: #0052cc;
-      box-shadow: 0 0 12px rgba(0, 102, 255, 0.4);
+    .pill.recording .waveform {
+      display: flex;
     }
 
-    .mic-button:active {
-      transform: scale(0.95);
+    .wave-bar {
+      width: 3px;
+      height: 4px;
+      background: white;
+      border-radius: 2px;
+      transition: height 0.05s ease;
     }
 
-    .mic-button.recording {
-      background-color: #ff4444;
-      border-color: #ff4444;
-      animation: pulse 0.8s infinite;
+    /* Processing state - pulsing dots */
+    .processing-indicator {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .pill.processing .processing-indicator {
+      display: flex;
+    }
+
+    .pill.processing .waveform {
+      display: none;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 50%;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+
+    .dot:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .dot:nth-child(3) {
+      animation-delay: 0.4s;
     }
 
     @keyframes pulse {
       0%, 100% {
-        box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7);
+        opacity: 0.4;
+        transform: scale(0.8);
       }
       50% {
-        box-shadow: 0 0 0 10px rgba(255, 68, 68, 0);
+        opacity: 1;
+        transform: scale(1);
       }
     }
 
-    @keyframes circleAnimation {
-      0%, 100% {
-        width: 60px;
-        height: 60px;
-      }
-      50% {
-        width: 70px;
-        height: 70px;
-      }
+    /* Status text (hidden by default, shown on error) */
+    .status-text {
+      display: none;
+      color: rgba(255, 255, 255, 0.7);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
     }
 
-    .mic-button.recording::after {
-      content: '';
-      position: absolute;
-      width: 70px;
-      height: 70px;
-      border: 2px solid rgba(255, 68, 68, 0.5);
-      border-radius: 50%;
-      animation: circleAnimation 1.2s infinite;
+    .pill.error .status-text {
+      display: block;
     }
 
-    /* Scrollbar styling */
-    .chat-history::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    .chat-history::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    .chat-history::-webkit-scrollbar-thumb {
-      background: #4a4a4a;
-      border-radius: 3px;
-    }
-
-    .chat-history::-webkit-scrollbar-thumb:hover {
-      background: #5a5a5a;
+    .pill.error .idle-indicator,
+    .pill.error .waveform,
+    .pill.error .processing-indicator {
+      display: none;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="status-bar" id="statusBar">Press F13 to talk</div>
-    <div class="chat-history" id="chatHistory"></div>
-    <div class="controls">
-      <button class="mic-button" id="micButton" title="Click or press F13 to record">🎤</button>
+  <div class="pill" id="pill">
+    <div class="idle-indicator"></div>
+    <div class="waveform" id="waveform">
+      <!-- Wave bars will be generated by JS -->
     </div>
+    <div class="processing-indicator">
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+    <div class="status-text" id="statusText"></div>
   </div>
 
   <script src="renderer.js"></script>

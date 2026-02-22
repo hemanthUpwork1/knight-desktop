@@ -1,5 +1,4 @@
-const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
-const { menubar } = require('menubar');
+const { app, BrowserWindow, globalShortcut, ipcMain, screen } = require('electron');
 const path = require('path');
 const dotenv = require('dotenv');
 const { uIOhook, UiohookKey } = require('uiohook-napi');
@@ -14,71 +13,73 @@ const { transcribe } = require('./src/whisper');
 const { chat } = require('./src/gateway');
 const { speak } = require('./src/tts');
 
-let mb;
+let mainWindow;
 let isRecording = false;
 let altPressed = false;
 let spacePressed = false;
 
-app.on('ready', () => {
-  const preloadPath = path.join(__dirname, 'preload.js');
-  console.log('Using preload:', preloadPath);
-  
-  mb = menubar({
-    index: `file://${path.join(__dirname, 'index.html')}`,
-    windowPosition: 'topRight',
-    preloadWindow: true,
-    showDockIcon: false,
-    width: 350,
-    height: 500,
-    // Pass webPreferences to menubar with correct config
-    browserWindow: {
-      webPreferences: {
-        preload: preloadPath,
-        nodeIntegration: false,
-        contextIsolation: true,
-        enableRemoteModule: false,
-        sandbox: true
-      }
+function createWindow() {
+  const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
+
+  mainWindow = new BrowserWindow({
+    width: 220,
+    height: 60,
+    x: Math.round((screenWidth - 220) / 2),
+    y: screenHeight - 80,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    focusable: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      sandbox: true
     }
   });
 
-  mb.on('ready', () => {
-    // Setup push-to-talk with uiohook (detects key release)
-    uIOhook.on('keydown', (e) => {
-      if (e.keycode === UiohookKey.Alt) altPressed = true;
-      if (e.keycode === UiohookKey.Space) spacePressed = true;
+  mainWindow.loadFile('index.html');
+  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
-      // Start recording when Alt+Space pressed
-      if (altPressed && spacePressed && !isRecording && mb.window) {
-        isRecording = true;
-        console.log('[Main] Alt+Space pressed, starting recording...');
-        mb.window.show();
-        mb.window.webContents.send('start-recording');
-      }
-    });
+  // Uncomment to debug:
+  // mainWindow.webContents.openDevTools({ mode: 'detach' });
+}
 
-    uIOhook.on('keyup', (e) => {
-      if (e.keycode === UiohookKey.Alt) altPressed = false;
-      if (e.keycode === UiohookKey.Space) spacePressed = false;
+app.on('ready', () => {
+  createWindow();
 
-      // Stop recording when either key is released
-      if (isRecording && (!altPressed || !spacePressed) && mb.window) {
-        isRecording = false;
-        console.log('[Main] Alt+Space released, stopping recording...');
-        mb.window.webContents.send('stop-recording');
-      }
-    });
+  // Setup push-to-talk with uiohook
+  uIOhook.on('keydown', (e) => {
+    if (e.keycode === UiohookKey.Alt) altPressed = true;
+    if (e.keycode === UiohookKey.Space) spacePressed = true;
 
-    // Start the hook
-    uIOhook.start();
-    console.log('[Main] uIOhook started, listening for Alt+Space...');
+    // Start recording when Alt+Space pressed
+    if (altPressed && spacePressed && !isRecording && mainWindow) {
+      isRecording = true;
+      console.log('[Main] Alt+Space pressed, starting recording...');
+      mainWindow.webContents.send('start-recording');
+    }
   });
 
-  mb.on('after-create-window', () => {
-    console.log('[Main] Window created. Opening DevTools...');
-    // Open DevTools for debugging
-    mb.window.webContents.openDevTools({ mode: 'detach' });
+  uIOhook.on('keyup', (e) => {
+    if (e.keycode === UiohookKey.Alt) altPressed = false;
+    if (e.keycode === UiohookKey.Space) spacePressed = false;
+
+    // Stop recording when either key is released
+    if (isRecording && (!altPressed || !spacePressed) && mainWindow) {
+      isRecording = false;
+      console.log('[Main] Alt+Space released, stopping recording...');
+      mainWindow.webContents.send('stop-recording');
+    }
   });
+
+  // Start the hook
+  uIOhook.start();
+  console.log('[Main] uIOhook started, listening for Alt+Space...');
 
   // IPC handlers
   ipcMain.handle('transcribe', async (event, audioBuffer) => {
@@ -113,7 +114,15 @@ app.on('ready', () => {
 });
 
 app.on('window-all-closed', () => {
-  // Don't quit on window close for menubar apps
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
 });
 
 app.on('will-quit', () => {
