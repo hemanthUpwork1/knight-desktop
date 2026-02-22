@@ -3,9 +3,11 @@ const fetch = require('node-fetch');
 async function chat(messages) {
   const gatewayUrl = process.env.OPENCLAW_GATEWAY_URL || 'http://localhost:18789';
   const gatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN || '';
+  const chatStartTime = Date.now();
 
   console.log('[Gateway] URL:', gatewayUrl);
   console.log('[Gateway] Token:', gatewayToken ? '***' : 'NOT SET');
+  console.log('[Gateway] Message count:', messages.length);
 
   // Try /v1/messages first (OpenClaw native), fall back to /v1/chat/completions (OpenAI compat)
   const endpoints = [
@@ -26,6 +28,8 @@ async function chat(messages) {
 
       const fullUrl = `${gatewayUrl}${endpoint}`;
       console.log(`[Gateway] ⏱️  Full URL: ${fullUrl}`);
+      console.log(`[Gateway] ⏱️  Request body size: ${body.length} bytes`);
+      
       const fetchStartTime = Date.now();
       const res = await fetch(fullUrl, {
         method: 'POST',
@@ -36,18 +40,38 @@ async function chat(messages) {
         body
       });
       const fetchEndTime = Date.now();
-      console.log(`[Gateway] ⏱️  Fetch took ${fetchEndTime - fetchStartTime}ms, status: ${res.status}`);
+      const fetchDuration = fetchEndTime - fetchStartTime;
+      console.log(`[Gateway] ⏱️  Fetch took ${fetchDuration}ms, status: ${res.status}`);
+      console.log(`[Gateway] ⏱️  First byte received after: ${fetchDuration}ms`);
 
       if (res.ok) {
         const parseStartTime = Date.now();
         const data = await res.json();
         const parseEndTime = Date.now();
-        console.log(`[Gateway] ⏱️  JSON parse took ${parseEndTime - parseStartTime}ms`);
+        const parseDuration = parseEndTime - parseStartTime;
+        
+        console.log(`[Gateway] ⏱️  JSON parse took ${parseDuration}ms`);
+        console.log(`[Gateway] ⏱️  Response content length: ${JSON.stringify(data).length} bytes`);
+        
+        const totalDuration = Date.now() - chatStartTime;
         console.log(`[Gateway] ⏱️  Total endpoint time: ${Date.now() - endpointStartTime}ms`);
-        return data.choices[0].message.content || data.content[0].text;
+        console.log(`[Gateway] ⏱️  TOTAL CHAT TIME: ${totalDuration}ms (Fetch: ${fetchDuration}ms, Parse: ${parseDuration}ms, Endpoint: ${endpoint})`);
+        
+        const content = data.choices[0].message.content || data.content[0].text;
+        return {
+          content,
+          timing: {
+            fetch: fetchDuration,
+            parse: parseDuration,
+            total: totalDuration,
+            endpoint: endpoint
+          }
+        };
       } else {
         const errorText = await res.text();
-        console.log(`[Gateway] ⏱️  Error (${res.status}) received after ${Date.now() - fetchStartTime}ms`);
+        const fetchDuration = fetchEndTime - fetchStartTime;
+        console.log(`[Gateway] ⏱️  Error (${res.status}) received after ${fetchDuration}ms`);
+        console.log(`[Gateway] ⏱️  Error response: ${errorText.substring(0, 200)}`);
         
         if (res.status === 404) {
           lastError = `${endpoint} returned 404`;
@@ -60,8 +84,9 @@ async function chat(messages) {
       
       lastError = `${endpoint} returned 404`;
     } catch (err) {
+      const duration = Date.now() - endpointStartTime;
       lastError = err.message;
-      console.log(`[Gateway] ⏱️  Exception after ${Date.now() - endpointStartTime}ms: ${err.message}`);
+      console.log(`[Gateway] ⏱️  Exception after ${duration}ms: ${err.message}`);
       continue;
     }
   }

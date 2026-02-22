@@ -101,6 +101,7 @@ async function startRecording() {
     };
 
     mediaRecorder.onstop = async () => {
+      const recordStartTime = Date.now();
       stopWaveformAnimation();
 
       // Release mic immediately after recording stops
@@ -109,34 +110,40 @@ async function startRecording() {
 
       setState('processing');
 
-      const recordEndTime = Date.now();
       const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       audioChunks = [];
+      console.log(`[Renderer] ⏱️  Audio blob size: ${audioBlob.size} bytes`);
 
       const transcribeStartTime = Date.now();
       const buffer = await audioBlob.arrayBuffer();
-      const result = await window.knight.transcribe(buffer);
+      const transcribeResult = await window.knight.transcribe(buffer);
       const transcribeEndTime = Date.now();
-      console.log(`[Renderer] ⏱️  Transcribe took ${transcribeEndTime - transcribeStartTime}ms`);
+      const transcribeDuration = transcribeResult.duration || (transcribeEndTime - transcribeStartTime);
+      console.log(`[Renderer] ⏱️  Transcribe: ${transcribeDuration}ms`);
 
-      if (!result.success) {
-        console.error('[Renderer] Transcription failed:', result.error);
+      if (!transcribeResult.success) {
+        console.error('[Renderer] Transcription failed:', transcribeResult.error);
         setState('error', 'Transcribe failed');
         setTimeout(() => setState('idle'), 2000);
         return;
       }
 
-      console.log('[Renderer] Transcribed:', result.text);
-      const userMessage = result.text;
+      console.log('[Renderer] Transcribed:', transcribeResult.text);
+      const userMessage = transcribeResult.text;
 
       // Send to gateway for response
       messages.push({ role: 'user', content: userMessage });
 
-      console.log('[Renderer] Sending to gateway:', messages);
+      console.log(`[Renderer] Sending to gateway (messages: ${messages.length}, total size: ${JSON.stringify(messages).length} bytes)`);
       const chatStartTime = Date.now();
       const chatResult = await window.knight.chat(messages);
       const chatEndTime = Date.now();
-      console.log(`[Renderer] ⏱️  Chat took ${chatEndTime - chatStartTime}ms`);
+      const chatDuration = chatResult.duration || (chatEndTime - chatStartTime);
+      console.log(`[Renderer] ⏱️  Chat total: ${chatDuration}ms`);
+      
+      if (chatResult.timing) {
+        console.log(`[Renderer] ⏱️  Chat breakdown - Network: ${chatResult.timing.fetch}ms, Parse: ${chatResult.timing.parse}ms, Endpoint: ${chatResult.timing.endpoint}`);
+      }
 
       if (!chatResult.success) {
         console.error('[Renderer] Chat failed:', chatResult.error);
@@ -154,14 +161,28 @@ async function startRecording() {
       const ttsStartTime = Date.now();
       const speakResult = await window.knight.speak(assistantMessage);
       const ttsEndTime = Date.now();
-      console.log(`[Renderer] ⏱️  TTS took ${ttsEndTime - ttsStartTime}ms`);
+      const ttsDuration = speakResult.duration || (ttsEndTime - ttsStartTime);
+      console.log(`[Renderer] ⏱️  TTS: ${ttsDuration}ms`);
 
       if (!speakResult.success) {
         console.error('[Renderer] TTS failed:', speakResult.error);
       }
 
       const totalEndTime = Date.now();
-      console.log(`[Renderer] ⏱️  TOTAL TIME: ${totalEndTime - recordEndTime}ms (Transcribe: ${transcribeEndTime - transcribeStartTime}ms, Chat: ${chatEndTime - chatStartTime}ms, TTS: ${ttsEndTime - ttsStartTime}ms)`);
+      const totalDuration = totalEndTime - recordStartTime;
+      
+      console.log(`\n[Renderer] ========== LATENCY BREAKDOWN ==========`);
+      console.log(`[Renderer] Audio Recording:  (included in total)`);
+      console.log(`[Renderer] Transcribe:      ${transcribeDuration}ms`);
+      console.log(`[Renderer] Chat:            ${chatDuration}ms`);
+      if (chatResult.timing) {
+        console.log(`[Renderer]   ├─ Network:    ${chatResult.timing.fetch}ms`);
+        console.log(`[Renderer]   └─ Parse:      ${chatResult.timing.parse}ms`);
+      }
+      console.log(`[Renderer] TTS:             ${ttsDuration}ms`);
+      console.log(`[Renderer] ────────────────────────────`);
+      console.log(`[Renderer] TOTAL:           ${totalDuration}ms`);
+      console.log(`[Renderer] ==========================================\n`);
 
       setState('idle');
     };

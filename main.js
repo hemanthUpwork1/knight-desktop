@@ -84,8 +84,11 @@ app.on('ready', () => {
   // IPC handlers
   ipcMain.handle('transcribe', async (event, audioBuffer) => {
     try {
+      const startTime = Date.now();
       const text = await transcribe(audioBuffer);
-      return { success: true, text };
+      const duration = Date.now() - startTime;
+      console.log(`[Main] Transcribe completed in ${duration}ms`);
+      return { success: true, text, duration };
     } catch (err) {
       console.error('Transcribe error:', err);
       return { success: false, error: err.message };
@@ -94,8 +97,21 @@ app.on('ready', () => {
 
   ipcMain.handle('chat', async (event, messages) => {
     try {
-      const response = await chat(messages);
-      return { success: true, response };
+      const startTime = Date.now();
+      const result = await chat(messages);
+      const duration = Date.now() - startTime;
+      console.log(`[Main] Chat completed in ${duration}ms`);
+      
+      // result might be an object with timing data (from updated gateway.js)
+      const response = typeof result === 'object' && result.content ? result.content : result;
+      const timing = typeof result === 'object' && result.timing ? result.timing : null;
+      
+      return { 
+        success: true, 
+        response,
+        duration,
+        timing
+      };
     } catch (err) {
       console.error('Chat error:', err);
       return { success: false, error: err.message };
@@ -104,8 +120,11 @@ app.on('ready', () => {
 
   ipcMain.handle('speak', async (event, text) => {
     try {
+      const startTime = Date.now();
       await speak(text);
-      return { success: true };
+      const duration = Date.now() - startTime;
+      console.log(`[Main] TTS completed in ${duration}ms`);
+      return { success: true, duration };
     } catch (err) {
       console.error('TTS error:', err);
       return { success: false, error: err.message };
